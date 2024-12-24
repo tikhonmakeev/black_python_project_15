@@ -27,7 +27,8 @@ def get_weather(city_name: str, interval: int):
         return f"Город {city_name} не найден.", None
 
     url = f"{BASE_URL}/forecasts/v1/daily/{interval}day/{location_key}"
-    params = {"apikey": TOKEN_WEATHER, "language": "ru", "metric": True}
+    params = {"apikey": TOKEN_WEATHER, "language": "ru",
+              "metric": True, "details": True}
 
     try:
         response = requests.get(url, params=params)
@@ -47,7 +48,7 @@ def get_weather(city_name: str, interval: int):
             date = forecast["Date"][:10]
             min_temp = forecast["Temperature"]["Minimum"]["Value"]
             max_temp = forecast["Temperature"]["Maximum"]["Value"]
-            precip = forecast["Day"]["PrecipitationType"]
+            precip = forecast["Day"]["PrecipitationProbability"]
             wind_speed = forecast["Day"]["Wind"]["Speed"]["Value"]
             wind_direction = forecast["Day"]["Wind"]["Direction"]["Localized"]
 
@@ -61,42 +62,45 @@ def get_weather(city_name: str, interval: int):
             forecast_text += (
                 f"Дата: {date}\n"
                 f"Температура: {min_temp}°C - {max_temp}°C\n"
-                f"Осадки: {precip}\n"
+                f"Осадки: {precip}%\n"
                 f"Ветер: {wind_speed} м/с, направление: {wind_direction}\n\n"
             )
 
         plot = generate_weather_plot(
-            dates, min_temps, max_temps, precipitations, wind_speeds)
+            dates, min_temps, max_temps, precipitations, wind_speeds, city_name)
         return forecast_text, plot
     except requests.RequestException as e:
         print(f"Ошибка: {e}")
         return "Ошибка получения прогноза погоды.", None
 
 
-def generate_weather_plot(dates, min_temps, max_temps, precipitations, wind_speeds):
+def generate_weather_plot(dates, min_temps, max_temps, precipitations, wind_speeds, city_name):  # Add city_name
     """Создает график погоды."""
-    fig, ax1 = plt.subplots(figsize=(10, 6))
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 15))  # 3 subplots
 
-    # График температуры
-    ax1.set_xlabel("Дата")
-    ax1.set_ylabel("Температура (°C)", color="tab:red")
-    ax1.plot(dates, min_temps, label="Мин. температура",
-             color="tab:red", linestyle="--")
-    ax1.plot(dates, max_temps, label="Макс. температура", color="tab:orange")
-    ax1.tick_params(axis="y", labelcolor="tab:red")
+    # Temperature Plot
+    # Add title with city name
+    ax1.set_title(f"Weather forecast for {city_name}")
+    ax1.set_ylabel("Temperature (°C)")
+    ax1.plot(dates, min_temps, label="Min Temp", marker='o')
+    ax1.plot(dates, max_temps, label="Max Temp", marker='x')
+    ax1.legend()
+    ax1.grid(True)
 
-    # График осадков
-    ax2 = ax1.twinx()
-    ax2.set_ylabel("Осадки (%)", color="tab:blue")
-    ax2.bar(dates, precipitations, alpha=0.3, color="tab:blue", label="Осадки")
-    ax2.tick_params(axis="y", labelcolor="tab:blue")
+    # Precipitation Plot
+    ax2.set_ylabel("Precipitation, %")
+    ax2.bar(dates, precipitations, label="Precipitation",
+            color='skyblue')  # Bar chart for precipitation
+    ax2.legend()
+    ax2.grid(True)
 
-    # График ветра
-    ax2.plot(dates, wind_speeds, label="Скорость ветра (м/с)",
-             color="tab:green", linestyle="--")
+    # Wind Speed Plot
+    ax3.set_ylabel("Wind Speed (m/s)")
+    ax3.plot(dates, wind_speeds, label="Wind Speed", marker='^', color='green')
+    ax3.legend()
+    ax3.grid(True)
 
     fig.tight_layout()
-    fig.legend(loc="upper left", bbox_to_anchor=(0.1, 0.9))
     buf = BytesIO()
     plt.savefig(buf, format="png")
     buf.seek(0)
